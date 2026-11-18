@@ -32,8 +32,6 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.zone:focus-visible{o
 h1{font-family:var(--f-display);font-weight:700;font-size:clamp(24px,3vw,36px);line-height:1.08;letter-spacing:-.015em;margin:0}
 .pm-tag{font-family:var(--f-mono);font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--amber);background:var(--amber-soft);border:1.5px solid var(--amber);border-radius:4px;padding:3px 8px;white-space:nowrap}
 .scope{margin:8px 0 0;color:var(--ink2);font-size:15.5px}
-.status-mini{margin:10px 0 0;max-width:900px;font-size:12.5px;line-height:1.45;color:#5a4410;background:#fff8e8;border-left:3px solid var(--amber);border-radius:3px;padding:6px 10px}
-.status-mini b{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--amber);margin-right:4px}
 
 /* chips + badges */
 .chip{display:inline-block;font-family:var(--f-mono);font-size:10.5px;font-weight:600;letter-spacing:.04em;border:1.5px solid currentColor;border-radius:3px;padding:0 5px;line-height:16px;vertical-align:1px;background:#fff}
@@ -354,7 +352,6 @@ table{border-collapse:collapse;width:100%}
     <span class="pm-tag">Planning model · Not validated</span>
   </div>
   <p class="scope" id="scope"></p>
-  <p class="status-mini" id="status" role="note"></p>
 </header>
 
 <main>
@@ -408,7 +405,7 @@ table{border-collapse:collapse;width:100%}
 
   <section class="wrap">
     <details class="details" id="details">
-      <summary><span>Details</span><span class="sum-sub">Make or Buy Plan, full results, All-purchased benchmark, zones, site, caveats and evidence</span></summary>
+      <summary><span>Details</span><span class="sum-sub">Make or Buy Plan, full results, All-purchased benchmark, zones, battery store, site, caveats and evidence</span></summary>
       <div class="d-body">
         <div class="d-grid">
           <article class="dp">
@@ -439,6 +436,12 @@ table{border-collapse:collapse;width:100%}
           <div class="table-scroll"><table class="rt" id="benchTable"></table></div>
         </article>
 
+        <article class="dp">
+          <h3>Proposed separated battery store: items to verify</h3>
+          <p class="fine0" id="battIntro"></p>
+          <ul class="facts" id="battVerify"></ul>
+        </article>
+
         <div class="d-grid">
           <article class="dp">
             <h3>Zones <span id="layoutLabel"></span></h3>
@@ -459,7 +462,7 @@ table{border-collapse:collapse;width:100%}
         </div>
 
         <div class="d-grid">
-          <article class="dp"><h3>Caveats</h3><ul class="facts cav" id="caveatList"></ul></article>
+          <article class="dp"><h3>Caveats</h3><p class="fine0" id="statusNote"></p><ul class="facts cav" id="caveatList"></ul></article>
           <article class="dp"><h3>Evidence still needed</h3><ul class="facts evid" id="evidence"></ul></article>
         </div>
 
@@ -496,7 +499,9 @@ const usable = D.site.usable_floor_area_sf;
 
 // ---------- header ----------
 $('scope').textContent = D.scope;
-$('status').innerHTML = `<b>Status note</b> ${esc(D.status_note)}`;
+// display names for zones whose source wording reads like a confirmed building feature
+const ZONE_DISPLAY = { 'Battery store (separated, fire-rated)': 'Proposed separated battery store' };
+const zoneName = name => ZONE_DISPLAY[name] || name;
 
 // ---------- state ----------
 const mixes = Object.keys(D.outcomes).sort((a, b) => parseInt(a) - parseInt(b));
@@ -580,7 +585,7 @@ const ZG = [
   { k: 'stores', m: /^Stores/, x: 40, y: 170, w: 230, h: 315, label: ['Stores and kitting'], t: 'ops', role: 'Holds frames, propellers and purchased parts, and picks one kit per drone for the lines.' },
   { k: 'line1', m: /line 1/, x: 295, y: 170, w: LINE_W, h: 150, label: ['Assembly, test and pack line 1'], sub: 'cobot-assisted, paced', t: 'ops', line: 0, role: 'Turns each kit into a drone: assembly, firmware, functional test, inspection, rework when needed, and packing.' },
   { k: 'line2', m: /line 2/, x: 295, y: 335, w: LINE_W, h: 150, label: ['Assembly, test and pack line 2'], sub: 'cobot-assisted, paced', t: 'ops', line: 1, role: 'Turns each kit into a drone: assembly, firmware, functional test, inspection, rework when needed, and packing.' },
-  { k: 'batt', m: /^Battery store/, x: 840, y: 170, w: 120, h: 315, label: ['Battery store', '(separated,', 'fire-rated)'], t: 'batt', role: 'Holds purchased battery packs apart from other stock; a pack joins each drone at packing.' },
+  { k: 'batt', m: /^Battery store/, x: 840, y: 170, w: 120, h: 315, label: ['Proposed', 'separated', 'battery store'], t: 'batt', role: 'Holds purchased battery packs apart from other stock; a pack joins each drone at packing.' },
   { k: 'recv', m: /^Receiving/, x: 40, y: 505, w: 470, h: 80, label: ['Receiving and incoming inspection'], t: 'recv', role: 'Purchased parts arrive and are inspected; battery packs go straight to the separated battery store.' },
   { k: 'fg', m: /^Finished goods/, x: 540, y: 505, w: 420, h: 80, label: ['Finished goods and shipping'], t: 'ops', role: 'Packed training drones are held here and shipped.' },
 ];
@@ -656,7 +661,7 @@ function drawFloor() {
   el('text', { x: 980, y: 615, 'text-anchor': 'end', class: 'z-sub' }, svg, 'Proposed layout. Building outline is schematic: no measured dimensions, doors, docks, exits or columns.');
 
   for (const z of zones) {
-    const g = el('g', { class: `zone t-${z.t}`, 'data-z': z.k, tabindex: 0, role: 'button', 'aria-label': `${z.data ? z.data.zone : z.label.join(' ')}: show details` }, svg);
+    const g = el('g', { class: `zone t-${z.t}`, 'data-z': z.k, tabindex: 0, role: 'button', 'aria-label': `${z.data ? zoneName(z.data.zone) : z.label.join(' ')}: show details` }, svg);
     const r = el('rect', { x: z.x, y: z.y, width: z.w, height: z.h, rx: 4, class: 'z-rect' }, g);
     if (z.t === 'batt') r.setAttribute('fill', 'url(#hatchB)');
     if (z.k === 'frame') r.style.stroke = COL.frame;
@@ -901,7 +906,7 @@ function openZone(k) {
   svg.querySelectorAll('.zone').forEach(g => g.classList.toggle('on', g.dataset.z === k));
   const rk = new Set(ROUTES.filter(r => r.z.includes(k)).map(r => r.k));
   svg.querySelectorAll('.route').forEach(p => p.classList.toggle('on', rk.has(p.dataset.r)));
-  $('zcName').textContent = z.data ? z.data.zone : z.label.join(' ');
+  $('zcName').textContent = z.data ? zoneName(z.data.zone) : z.label.join(' ');
   $('zcRole').textContent = z.role;
   let area = z.data && z.data.area_sf !== undefined ? `Modeled area: <b>${n(z.data.area_sf)} SF</b> ${chip('MODEL')}` : 'Modeled area: not supplied';
   if (z.line !== undefined) {
@@ -960,7 +965,7 @@ if (hasBench && D.comparison_baseline) {
 $('layoutLabel').innerHTML = chip(D.layout.label);
 $('layoutStatus').textContent = `${D.layout.status}. Scenario: ${D.layout.scenario}.`;
 const zt = $('zoneTable');
-zt.querySelector('tbody').innerHTML = D.layout.zones.map(z => `<tr><td>${esc(z.zone)}</td><td>${n(z.area_sf)} SF</td></tr>`).join('');
+zt.querySelector('tbody').innerHTML = D.layout.zones.map(z => `<tr><td>${esc(zoneName(z.zone))}</td><td>${n(z.area_sf)} SF</td></tr>`).join('');
 zt.querySelector('tfoot').innerHTML = `<tr><td>Total modeled area</td><td>${n(D.layout.zones_total_sf)} SF</td></tr>`;
 $('zonesNote').textContent = D.layout.zones_note.replace(/zones_total_sf/g, 'the total modeled area');
 
@@ -970,10 +975,20 @@ $('listing').innerHTML = lf.items.map(i => `<li>${esc(i)}</li>`).join('');
 $('listingNote').textContent = lf.note;
 $('usable').innerHTML = CASES.map(c => `<div><b>${n(usable[c])} SF</b><span>${CASE_T[c]}</span></div>`).join('');
 $('unknowns').innerHTML = D.site.unknown.map(u => `<li>${esc(u)} ${chip('UNKNOWN')}</li>`).join('');
+$('statusNote').textContent = `Status: ${D.status_note}`;
 $('caveatList').innerHTML = D.caveats.map(c => `<li>${esc(c)}</li>`).join('');
 $('evidence').innerHTML = D.evidence_needed.map(c => `<li>${esc(c)}</li>`).join('');
 $('labels').innerHTML = Object.entries(D.labels).map(([k, v]) => `<div><dt>${chip(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
 $('optimizer').textContent = D.optimizer_summary;
+
+// battery store: fire rating and storage limits are items to verify, not confirmed features
+const bz = D.layout.zones.find(z => /^Battery store/.test(z.zone));
+$('battIntro').textContent = `Proposed zone on the illustrative layout${bz ? `, modeled at ${n(bz.area_sf)} SF` : ''}. It holds purchased battery packs apart from other stock. None of the items below is confirmed.`;
+const bItems = [];
+if (bz && /fire-rated/.test(bz.zone)) bItems.push(`Fire rating of the store enclosure: the plan assumes a fire-rated, separated store; not confirmed ${chip('UNKNOWN')}`);
+D.site.unknown.filter(u => /batter/i.test(u)).forEach(u => bItems.push(`${esc(u.charAt(0).toUpperCase() + u.slice(1))} ${chip('UNKNOWN')}`));
+D.evidence_needed.filter(e => /batter/i.test(e)).forEach(e => bItems.push(`${esc(e)} (evidence still needed)`));
+$('battVerify').innerHTML = bItems.map(i => `<li>${i}</li>`).join('');
 
 // ---------- refresh + boot ----------
 function refresh() { syncSeg(); renderSide(); renderWatch(); renderBottleneck(); if (selZone) openZone(selZone); }
